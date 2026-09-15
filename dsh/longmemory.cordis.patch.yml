@@ -4,7 +4,10 @@
 # environment so this file holds no deployment-specific value.
 #
 # failOnStartupError stays at its default (false): if LongMemory is still booting the
-# harness starts without its tools and the client reconnects with backoff.
+# harness starts without its tools and the client reconnects with backoff. The default
+# budget (10 attempts, 30 s ceiling) gives up after about 2.5 minutes, and on a fresh
+# deployment this service builds in one minute while LongMemory builds from source in
+# several, so the budget is raised to outlast any first-deploy ordering.
 - insert:
     - id: longmemory-mcp
       name: '@deepseek-ai/dsh-mcp-client'
@@ -14,3 +17,8 @@
         url: !!js process.env.LONGMEMORY_MCP_URL
         headers:
           Authorization: !!js '`Bearer ${process.env.LONGMEMORY_API_KEY}`'
+        reconnect:
+          enabled: true
+          initialDelayMs: 2000
+          maxDelayMs: 30000
+          maxAttempts: 240

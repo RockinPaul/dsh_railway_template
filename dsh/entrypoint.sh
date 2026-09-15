@@ -49,7 +49,8 @@ fi
 # authentication. Off unless DSH_GATE_PASSWORD is set; the hash is computed at boot so
 # no secret is written into the image or the repository.
 mkdir -p /run/caddy
-: > /run/caddy/gate.caddy
+# A comment rather than an empty file: Caddy warns on importing an empty file.
+printf '# no edge gate: DSH_GATE_PASSWORD is not set\n' > /run/caddy/gate.caddy
 if [ -n "${DSH_GATE_PASSWORD:-}" ]; then
     # hash-password reads one newline-terminated line from stdin; without the newline it fails with EOF.
     hash="$(printf '%s\n' "${DSH_GATE_PASSWORD}" | caddy hash-password)"

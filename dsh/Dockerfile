@@ -53,7 +53,7 @@ RUN set -eux; \
 # leaves the volume empty while state lands in the image layer and dies on redeploy.
 # -M because /data does not exist at build time; the entrypoint creates it. The node
 # base image already owns uid 1000 as `node`, so that account is removed first.
-RUN userdel -r node 2>/dev/null || true; \
+RUN userdel node 2>/dev/null || true; rm -rf /home/node; \
     useradd -u 1000 -d /data/home -M -s /bin/bash dsh
 
 # Constants are baked so no service variable can be nulled into a required composer

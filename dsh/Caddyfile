@@ -23,7 +23,6 @@
 		# 403 while the page still loads.
 		reverse_proxy 127.0.0.1:{$DSH_PORT} {
 			header_up X-Forwarded-Proto https
-			header_up X-Forwarded-For {remote_host}
 		}
 	}
 }
