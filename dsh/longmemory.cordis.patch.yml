@@ -1,0 +1,16 @@
+# LongMemory as an MCP tool server for the agent: recall, ingest, decisions, task
+# state, code graph and more appear as mcp__longmemory__<tool>. Applied by the
+# entrypoint only when LONGMEMORY_MCP_URL is set; the URL and key come from the
+# environment so this file holds no deployment-specific value.
+#
+# failOnStartupError stays at its default (false): if LongMemory is still booting the
+# harness starts without its tools and the client reconnects with backoff.
+- insert:
+    - id: longmemory-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: longmemory
+        transport: streamable-http
+        url: !!js process.env.LONGMEMORY_MCP_URL
+        headers:
+          Authorization: !!js '`Bearer ${process.env.LONGMEMORY_API_KEY}`'

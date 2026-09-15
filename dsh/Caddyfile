@@ -1,0 +1,29 @@
+{
+	admin off
+	# Railway terminates TLS at its edge and speaks plain HTTP to this container.
+	auto_https off
+}
+
+:{$PORT} {
+	# Answered by Caddy itself: the platform health check carries no cookie, and DSH
+	# answers every unauthenticated index request with 401.
+	handle /up {
+		respond "ok" 200
+	}
+
+	handle {
+		# Optional second gate. The entrypoint writes a basic_auth snippet here only
+		# when DSH_GATE_PASSWORD is set; otherwise the file is empty and this is a no-op.
+		import /run/caddy/gate.caddy
+
+		# DSH listens on loopback only. Caddy passes the client's Host through
+		# untouched, which is required: DSH's /api trust fence demands that the
+		# request Host be loopback or a --trusted-host entry AND that any Origin
+		# equal that Host. Rewriting Host here turns every browser WebSocket into a
+		# 403 while the page still loads.
+		reverse_proxy 127.0.0.1:{$DSH_PORT} {
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+}
