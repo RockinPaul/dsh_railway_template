@@ -45,9 +45,14 @@ if [ -n "${LONGMEMORY_MCP_URL:-}" ]; then
     echo "dsh: LongMemory MCP server at ${LONGMEMORY_MCP_URL}"
 fi
 
-# Optional second gate at the edge: HTTP basic auth in front of DSH's own session
-# authentication. Off unless DSH_GATE_PASSWORD is set; the hash is computed at boot so
-# no secret is written into the image or the repository.
+# The edge gate: HTTP basic auth in front of DSH's own session authentication. The
+# template generates DSH_GATE_PASSWORD, so this is normally on; the hash is computed
+# at boot so no secret is written into the image or the repository.
+#
+# It is also the interlock for auto sign-in below. Auto sign-in redeems DSH's launch
+# token on the visitor's behalf, so whoever reaches the index gets a session — which
+# is exactly what this gate decides. No gate, no auto sign-in: the deployment falls
+# back to DSH's own token URL rather than standing open.
 mkdir -p /run/caddy
 # A comment rather than an empty file: Caddy warns on importing an empty file.
 printf '# no edge gate: DSH_GATE_PASSWORD is not set\n' > /run/caddy/gate.caddy
@@ -64,11 +69,83 @@ if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
 fi
 
 echo "dsh: gateway on :${PORT}, harness on 127.0.0.1:${DSH_PORT}, workspace ${DSH_WORKSPACE}"
-echo "dsh: the 'dsh web:' URL below carries the sign-in token; open it as https://${RAILWAY_PUBLIC_DOMAIN:-<your-domain>}/?token=..."
+
+# ---------------------------------------------------------------------------
+# Auto sign-in
+# ---------------------------------------------------------------------------
+# DSH mints a launch token with randomBytes() at every process start — it cannot be
+# preset by flag, environment or config — and that token is the only way to obtain
+# the browser session cookie. Left alone, the deployer's first login means opening
+# the deploy logs and hand-editing a loopback URL, which is not something to ask of
+# someone who just clicked Deploy.
+#
+# So the gateway redeems it for them. The token is captured from DSH's own output
+# here, and Caddy bounces a session-less visitor through DSH's ordinary /?token=
+# exchange, which answers 303 + Set-Cookie exactly as it does for a pasted URL.
+# Nothing in DSH's auth is bypassed or reimplemented; the cookie is minted by DSH,
+# with its own secret, and the edge gate decides who gets to reach the exchange.
+#
+# The redirect excludes requests that already carry a cookie or a token, so a stale
+# token answers 401 once instead of looping.
+mkdir -p /run/dsh
+rm -f /run/dsh/log
+mkfifo /run/dsh/log
+TOKEN_FILE=/run/dsh/launch-token
+: > "${TOKEN_FILE}"
+chown -R dsh:dsh /run/dsh
+
+cd "${DSH_WORKSPACE}"
+gosu dsh dsh "$@" > /run/dsh/log 2>&1 &
+DSH_PID=$!
+
+# Every line goes through to the deploy log unchanged; the one carrying the token is
+# also parsed. The token is base64url, so it ends at the first character outside
+# that alphabet.
+(
+    while IFS= read -r line; do
+        printf '%s\n' "${line}"
+        case "${line}" in
+            *"dsh web:"*"?token="*)
+                if [ ! -s "${TOKEN_FILE}" ]; then
+                    t="${line##*\?token=}"
+                    printf '%s' "${t%%[!A-Za-z0-9_-]*}" > "${TOKEN_FILE}"
+                fi
+                ;;
+        esac
+    done < /run/dsh/log
+) &
+
+# Measured at about 2.4 s after start; the health check allows 300, so waiting here
+# costs nothing and keeps Caddy's config a single static file with no reload API.
+printf '# no auto sign-in\n' > /run/caddy/signin.caddy
+if [ -n "${DSH_GATE_PASSWORD:-}" ]; then
+    i=0
+    while [ ! -s "${TOKEN_FILE}" ] && [ "${i}" -lt 60 ]; do
+        kill -0 "${DSH_PID}" 2>/dev/null || break
+        i=$((i + 1))
+        sleep 1
+    done
+    if [ -s "${TOKEN_FILE}" ]; then
+        printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n}\nredir @dsh_needs_signin /?token=%s 302\n' \
+            "$(cat "${TOKEN_FILE}")" > /run/caddy/signin.caddy
+        echo "dsh: auto sign-in armed — open https://${RAILWAY_PUBLIC_DOMAIN:-<your-domain>}/ and authenticate at the edge gate"
+    else
+        echo "WARNING: the 'dsh web:' token line did not appear; sign in with its token from this log instead." >&2
+    fi
+else
+    echo "dsh: no DSH_GATE_PASSWORD, so auto sign-in stays off — sign in with the 'dsh web:' token below." >&2
+fi
+chown dsh:dsh /run/caddy/signin.caddy
 
 # Caddy runs as the same unprivileged user, in the background; tini reaps it. If it
 # dies the health check fails and Railway restarts the container.
 gosu dsh caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
+CADDY_PID=$!
 
-cd "${DSH_WORKSPACE}"
-exec gosu dsh dsh "$@"
+# dsh is no longer exec'd, so its exit status has to be carried out by hand, and a
+# platform stop has to reach both children rather than only this shell.
+trap 'kill -TERM "${DSH_PID}" "${CADDY_PID}" 2>/dev/null || true' TERM INT
+wait "${DSH_PID}"
+status=$?
+kill -TERM "${CADDY_PID}" 2>/dev/null || true
+exit "${status}"

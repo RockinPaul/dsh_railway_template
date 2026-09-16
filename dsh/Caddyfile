@@ -11,10 +11,25 @@
 		respond "ok" 200
 	}
 
-	handle {
-		# Optional second gate. The entrypoint writes a basic_auth snippet here only
-		# when DSH_GATE_PASSWORD is set; otherwise the file is empty and this is a no-op.
+	# `route`, not `handle`. Inside `handle` Caddy applies its own directive order,
+	# in which `redir` sorts BEFORE `basic_auth`: the auto sign-in redirect below
+	# then answers a credential-less `GET /` with 302 and the live token, handing
+	# DSH's session to anyone who asks, while every other path still returns 401 and
+	# the gate looks like it works. Measured on 2.11.2, and the reason for the
+	# gateway test in the repository. `route` keeps the written order.
+	route {
+		# The edge gate. The entrypoint writes a basic_auth snippet here when
+		# DSH_GATE_PASSWORD is set; otherwise the file is a comment and this is a
+		# no-op. With auto sign-in armed, this gate is what actually keeps strangers
+		# out, which is why the entrypoint arms one only alongside the other.
 		import /run/caddy/gate.caddy
+
+		# Auto sign-in. DSH mints a launch token per process and trades it for a
+		# 30-day session cookie; the entrypoint writes that redirect here so a
+		# deployer never has to read the token out of the deploy logs. The matcher
+		# skips requests that already carry a session or a token, so a stale token
+		# answers 401 once instead of looping.
+		import /run/caddy/signin.caddy
 
 		# DSH listens on loopback only. Caddy passes the client's Host through
 		# untouched, which is required: DSH's /api trust fence demands that the

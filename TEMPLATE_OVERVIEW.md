@@ -16,10 +16,14 @@ the browser's `Host` header passes through untouched — because DSH checks ever
 WebSocket against a trust fence that requires the request `Host` to be a trusted authority and any
 `Origin` to match it. The template registers your Railway domain as trusted at boot.
 
-Sign-in is DSH's own. Each start prints a one-time URL carrying a token; opening it sets a signed
-30-day cookie. That cookie's signing secret lives on the volume, so a redeploy prints a new token but
-does not sign you out. Your workspace, sessions, settings, credentials and any toolchain you install
-also live on the volume.
+Sign-in is a password you copy once from the service's Variables tab. Underneath it is still DSH's
+own session: DSH mints a fresh launch token at every process start and trades it for a signed 30-day
+cookie, and the token cannot be preset by flag, environment or config. Left alone that would mean
+reading a token out of the deploy logs on every first visit, so the gateway does the exchange for
+you — it holds the current token and walks your browser through DSH's ordinary sign-in the moment
+you clear the password prompt. The password is a normal service variable, so it does not rotate,
+and the cookie's signing secret lives on the volume, so redeploys do not sign you out. Your
+workspace, sessions, settings, credentials and any toolchain you install also live on the volume.
 
 ## Common Use Cases
 
@@ -65,16 +69,23 @@ as `mcp__longmemory__*` — recall, ingest, remember a decision, update task sta
 graph and more. If LongMemory is still starting, the harness comes up without those tools and
 reconnects with backoff.
 
-**First run:** open the `dsh` service's deploy logs, find the `dsh web:` line, and open
-`https://<your-dsh-domain>/?token=…` with its token. If you left the key blank, paste it under
-*Settings → Models*. An optional edge gate adds HTTP basic auth in front of DSH's sign-in when you
-set `DSH_GATE_PASSWORD` on the service.
+**First run:** open your `dsh` domain. The browser asks for a username and password: they are
+`DSH_GATE_USER` and `DSH_GATE_PASSWORD` on the `dsh` service's Variables tab, generated for your
+deployment. That is the whole sign-in — DSH's own session is established for you behind it. If you
+left the API key blank, paste it under *Settings → Models*.
+
+Clearing `DSH_GATE_PASSWORD` turns the gate off, and with it the automatic sign-in: the deployment
+falls back to DSH's own token URL, printed on the `dsh web:` line of the deploy logs, which you open
+as `https://<your-dsh-domain>/?token=…`. The two move together on purpose. The gate is what decides
+who may reach the sign-in exchange, so a deployment that removed the gate but kept the convenience
+would hand a session to whoever loaded the page.
 
 Three things to know. Upstream has shipped only alphas and release candidates so far, and releases
 land every few days; the pinned version moves accordingly. Running sessions end on redeploy — files
-survive, in-flight agent turns do not. And the token exchange, the fence and the MCP client were all
-measured against the running service: an unauthenticated index request is 401, a foreign `Host` or
-`Origin` on the API is 403, and a cookie issued before a redeploy authenticates after it.
+survive, in-flight agent turns do not. And the gate, the exchange, the fence and the MCP client were
+all measured against the running service: without the gate password every path answers 401 while the
+health check stays open, a foreign `Host` or `Origin` on the API is 403, and a cookie issued before a
+redeploy authenticates after it.
 
 ## Why Deploy DSH on Railway?
 
