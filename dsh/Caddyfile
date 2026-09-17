@@ -59,8 +59,39 @@
 			# what keeps this from looping.
 			@unauthenticated status 401
 			handle_response @unauthenticated {
-				import /run/caddy/signin.caddy
-				copy_response
+				route {
+					import /run/caddy/signin.caddy
+
+					# The cross-site arrival. DSH's session cookie is SameSite=Strict,
+					# and a browser withholds Strict cookies on the first request after
+					# a cross-site navigation — so a deployer who CLICKS THROUGH from
+					# the Railway dashboard completes the exchange, is handed the
+					# cookie, and then lands here without it. Reported from a real
+					# browser; every test until then used address-bar navigation,
+					# which is same-site, and passed.
+					#
+					# The cookie is fine and already stored: it just needs one
+					# same-site navigation to be sent. This page provides exactly
+					# that, from our own origin, which is why it is a page and not
+					# another redirect — a redirect inherits the chain's cross-site
+					# initiator and would be withheld again.
+					#
+					# It moves to signedin=2, which the snippet above declines to act
+					# on, so a browser that genuinely cannot store cookies gets DSH's
+					# own 401 here rather than another round.
+					@needs_same_site_hop {
+						path /
+						method GET
+						query signedin=1
+					}
+					handle @needs_same_site_hop {
+						header Cache-Control "no-store"
+						header Content-Type "text/html; charset=utf-8"
+						respond `<!doctype html><meta charset="utf-8"><title>Signing in</title><script>location.replace("/?signedin=2")</script><body style="font:15px system-ui;padding:2rem"><p>Signing in<noscript> &mdash; <a href="/?signedin=2">continue</a></noscript>.` 200
+					}
+
+					copy_response
+				}
 			}
 		}
 	}

@@ -143,11 +143,20 @@ check "  and carries the live token"           "/?token=TOK123" "$(loc "${A[@]}"
 check "STALE cookie also redirects"            302 "$(code "${A[@]}" -H 'Cookie: dsh-auth-X=stale' "$U/")"
 check "  rather than stranding on 401"         "/?token=TOK123" "$(loc "${A[@]}" -H 'Cookie: dsh-auth-X=stale' "$U/")"
 
+echo "cross-site arrival (SameSite=Strict withholds the cookie on the first hop):"
+check "401 on signedin=1 serves the hop page"   200 "$(code "${A[@]}" "$U/?signedin=1")"
+check "  and it points at signedin=2"           1 \
+    "$(curl -s "${A[@]}" "$U/?signedin=1" | grep -c 'signedin=2')"
+check "signedin=2 with a cookie serves the app" 200 "$(code "${A[@]}" -H 'Cookie: dsh-auth-X=good' "$U/?signedin=2")"
+check "signedin=2 without one stops at 401"     401 "$(code "${A[@]}" "$U/?signedin=2")"
+
 echo "loop guard (a client whose cookies never stick):"
 check "exchange lands on the marker, not /"    "/?signedin=1" "$(loc "${A[@]}" "$U/?token=TOK123")"
-check "marker declines to redirect again"      401 "$(code "${A[@]}" "$U/?signedin=1")"
-check "cookieless walk terminates"             "2 401" \
+# curl runs no JS, so it stops at the hop page; the hop's own target is asserted
+# above, and signedin=2 is where a cookie-less client actually terminates.
+check "cookieless walk stops at the hop page"  "2 200" \
     "$(curl -s "${A[@]}" -o /dev/null -L --max-redirs 8 -w '%{num_redirects} %{http_code}' "$U/" 2>/dev/null)"
+check "and no redirect is issued from there"   "" "$(loc "${A[@]}" "$U/?signedin=2")"
 # A client that DOES keep cookies walks the whole flow: 401 -> exchange -> marker.
 jar=$(mktemp)
 check "cookie-keeping walk signs in"           "2 200" \
