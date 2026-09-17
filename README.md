@@ -26,7 +26,7 @@ that is not optional.
 
 | Service | Variable | Default | Purpose |
 |---|---|---|---|
-| `dsh` | `DEEPSEEK_API_KEY` | **you set it** | The model credential. Can also be entered later under *Settings → Models*; the harness stores it on the volume. |
+| `dsh` | `DEEPSEEK_API_KEY` | **you set it** | The model credential, and it has to be set here. DSH gates its settings pane on the page being loopback, so on a Railway domain *Settings → Models* reports "settings are unavailable in this browser". |
 | `dsh` | `LONGMEMORY_MCP_URL` | `http://${{longmemory.RAILWAY_PRIVATE_DOMAIN}}:8080/mcp` | Where the MCP client dials. Unset it to run without LongMemory. |
 | `dsh` | `LONGMEMORY_API_KEY` | `${{longmemory.LONGMEMORY_API_KEY}}` | Bearer token for that endpoint. |
 | `dsh` | `DSH_TRUSTED_HOSTS` | *(empty)* | Extra hostnames, comma-separated, for custom domains. `RAILWAY_PUBLIC_DOMAIN` is always trusted. |
@@ -46,7 +46,10 @@ Baked into the `dsh` image: `PORT=8080`, `DSH_PORT=7000`, `HOME=/data/home`, `DS
    generated for your deployment and do not rotate.
 3. That is the sign-in. The gateway walks your browser through DSH's own token exchange behind the
    prompt, so you land on a clean `/` with a signed 30-day cookie.
-4. If you did not set `DEEPSEEK_API_KEY` at deploy time, paste it under *Settings → Models*.
+4. If you did not set `DEEPSEEK_API_KEY` at deploy time, set it on the `dsh` service's Variables
+   tab. It cannot be entered in the app: upstream allows editing settings only from a loopback
+   page, so on a public domain *Settings → Models* reports "settings are unavailable in this
+   browser". The same applies to every other pane under Settings.
 5. Start a session. The LongMemory tools appear to the model as `mcp__longmemory__*` — recall,
    ingest, remember a decision, update task state, code graph and more.
 

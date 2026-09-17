@@ -34,7 +34,7 @@ workspace, sessions, settings, credentials and any toolchain you install also li
 
 ## Dependencies for DSH Hosting
 
-- A **DeepSeek API key**, set at deploy time or later under *Settings → Models*.
+- A **DeepSeek API key**, set as the `DEEPSEEK_API_KEY` variable on the `dsh` service.
 - Two volumes, created by the template: one for the agent's home and workspace, one for
   LongMemory's database.
 - Optionally, an OpenAI or Gemini key on the `longmemory` service for semantic recall. Without one,
@@ -71,8 +71,13 @@ reconnects with backoff.
 
 **First run:** open your `dsh` domain. The browser asks for a username and password: they are
 `DSH_GATE_USER` and `DSH_GATE_PASSWORD` on the `dsh` service's Variables tab, generated for your
-deployment. That is the whole sign-in — DSH's own session is established for you behind it. If you
-left the API key blank, paste it under *Settings → Models*.
+deployment. That is the whole sign-in — DSH's own session is established for you behind it.
+
+Set `DEEPSEEK_API_KEY` on the `dsh` service if you left it blank at deploy time, rather than looking
+for it in the app. Upstream allows editing settings only from a loopback page, so on a public domain
+*Settings → Models* reports "settings are unavailable in this browser" — that is DSH's own rule, not
+something this template can change. Everything the deployment needs is a service variable for the
+same reason.
 
 Clearing `DSH_GATE_PASSWORD` turns the gate off, and with it the automatic sign-in: the deployment
 falls back to DSH's own token URL, printed on the `dsh web:` line of the deploy logs, which you open

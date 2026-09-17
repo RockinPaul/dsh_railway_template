@@ -65,7 +65,7 @@ fi
 chown -R dsh:dsh /run/caddy
 
 if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
-    echo "WARNING: DEEPSEEK_API_KEY is empty; set it as a variable, or in Settings -> Models after signing in." >&2
+    echo "WARNING: DEEPSEEK_API_KEY is empty. Set it as a service variable — DSH gates its settings pane on a loopback page, so it cannot be entered from a public domain." >&2
 fi
 
 echo "dsh: gateway on :${PORT}, harness on 127.0.0.1:${DSH_PORT}, workspace ${DSH_WORKSPACE}"
