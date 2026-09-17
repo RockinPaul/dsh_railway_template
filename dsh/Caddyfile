@@ -29,13 +29,6 @@
 		# out, which is why the entrypoint arms one only alongside the other.
 		import /run/caddy/gate.caddy
 
-		# Auto sign-in. DSH mints a launch token per process and trades it for a
-		# 30-day session cookie; the entrypoint writes that redirect here so a
-		# deployer never has to read the token out of the deploy logs. The matcher
-		# skips requests that already carry a session or a token, so a stale token
-		# answers 401 once instead of looping.
-		import /run/caddy/signin.caddy
-
 		# DSH listens on loopback only. Caddy passes the client's Host through
 		# untouched, which is required: DSH's /api trust fence demands that the
 		# request Host be loopback or a --trusted-host entry AND that any Origin
@@ -45,17 +38,30 @@
 			header_up X-Forwarded-Proto https
 
 			# Break the sign-in loop. DSH ends its token exchange with 303 to "/",
-			# which is exactly what the redirect above matches, so the whole thing
-			# terminates only because the session cookie comes back. When it does
-			# not — blocked, cleared by an extension, or a locked-down profile —
-			# the browser bounces between the two forever and Firefox gives up with
+			# which is what the sign-in redirect matches, so the flow terminates
+			# only because the session cookie comes back. When it does not —
+			# blocked, cleared by an extension, or a locked-down profile — the
+			# browser bounces between the two forever and Firefox gives up with
 			# "The page isn't redirecting properly". Reported from a real browser.
 			#
 			# Landing that 303 on "/?signedin=1" instead means the second visit
-			# never matches the redirect: it falls through to DSH, which answers a
-			# single 401. A deployment whose cookies do not stick then shows one
-			# honest error instead of an infinite loop.
+			# never matches: it falls through and answers a single honest 401.
 			header_down Location ^/$ /?signedin=1
+
+			# Sign-in is driven by DSH's own answer, not by guessing from the
+			# request. An earlier version redirected when no dsh-auth cookie was
+			# present, which meant any cookie — stale, expired, or rejected —
+			# suppressed sign-in forever and left the visitor on DSH's bare
+			# "authentication required; reopen the URL printed by dsh web".
+			# Reported from a real browser, again. Only DSH knows whether a cookie
+			# is good, so the 401 is the trigger; a fresh token then overwrites the
+			# bad cookie. The snippet declines on the "signedin" marker, which is
+			# what keeps this from looping.
+			@unauthenticated status 401
+			handle_response @unauthenticated {
+				import /run/caddy/signin.caddy
+				copy_response
+			}
 		}
 	}
 }
