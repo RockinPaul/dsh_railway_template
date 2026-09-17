@@ -41,7 +41,9 @@ fi
 mkdir -p "$WORK/run/caddy"
 hash=$(printf 'testpass\n' | "$CADDY" hash-password)
 printf 'basic_auth {\n\tdsh %s\n}\n' "$hash" > "$WORK/run/caddy/gate.caddy"
-printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n}\nredir @dsh_needs_signin /?token=TOK123 302\n' > "$WORK/run/caddy/signin.caddy"
+# Boot state: Caddy starts before DSH has printed a token, exactly as the entrypoint
+# does, because waiting for one leaves the port unserved and the edge answers 502.
+printf '# no auto sign-in yet\n' > "$WORK/run/caddy/signin.caddy"
 printf ':%s {\n\trespond "BACKEND" 200\n}\n' "$BACKEND_PORT" > "$WORK/backend.caddyfile"
 sed "s#/run/caddy#$WORK/run/caddy#g" "$HERE/Caddyfile" > "$WORK/gateway.caddyfile"
 
@@ -61,6 +63,31 @@ check() { # label, expected, actual
 }
 code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 U="http://127.0.0.1:$GATEWAY_PORT"
+
+echo "before the token exists (the 502 window this ordering removes):"
+check "gateway already serving /up"        200 "$(code "$U/up")"
+check "GET / proxies, no redirect yet"     200 "$(code -u dsh:testpass "$U/")"
+check "GET / still gated"                  401 "$(code "$U/")"
+
+# Arm auto sign-in the way the entrypoint does: write the snippet, then reload.
+# A probe runs across the reload to prove the listener never drops, which is the
+# whole reason the config is reloaded instead of Caddy being started late.
+printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n}\nredir @dsh_needs_signin /?token=TOK123 302\n' > "$WORK/run/caddy/signin.caddy"
+(
+    drops=0
+    for _ in $(seq 1 40); do
+        c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$U/up" 2>/dev/null)
+        [ "$c" = "200" ] || drops=$((drops + 1))
+    done
+    echo "$drops" > "$WORK/drops"
+) &
+probe=$!
+PORT="$GATEWAY_PORT" DSH_PORT="$BACKEND_PORT" \
+    "$CADDY" reload --config "$WORK/gateway.caddyfile" --adapter caddyfile >>"$WORK/gateway.log" 2>&1
+reloaded=$?
+wait "$probe"
+check "reload succeeded"                   0 "$reloaded"
+check "listener never dropped during reload" 0 "$(cat "$WORK/drops")"
 
 echo "no credentials:"
 check "GET / must not leak the redirect"   401 "$(code "$U/")"

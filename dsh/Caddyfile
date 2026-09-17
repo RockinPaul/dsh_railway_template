@@ -1,5 +1,10 @@
 {
-	admin off
+	# Loopback-only, and only so the entrypoint can `caddy reload` once DSH has
+	# printed its launch token. Caddy must start BEFORE that token exists, because
+	# anything else leaves the port unserved while the container is already routable
+	# and Railway's edge answers 502 — measured at 3s, and up to 60s when the token
+	# line is slow. Nothing outside this container can reach 127.0.0.1:2019.
+	admin 127.0.0.1:2019
 	# Railway terminates TLS at its edge and speaks plain HTTP to this container.
 	auto_https off
 }

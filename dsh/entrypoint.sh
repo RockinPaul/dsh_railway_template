@@ -94,6 +94,17 @@ TOKEN_FILE=/run/dsh/launch-token
 : > "${TOKEN_FILE}"
 chown -R dsh:dsh /run/dsh
 
+# Caddy starts FIRST, before the token exists, and auto sign-in is armed later by a
+# reload. The container is routable the moment it starts, so any gap before
+# something listens on $PORT is answered by Railway's edge with 502 — waiting for
+# the token here cost 3 seconds of that on every restart, redeploy and host
+# migration, and would have cost 60 on a slow boot. The gate is already written, so
+# nothing is served unauthenticated during the gap.
+printf '# no auto sign-in yet\n' > /run/caddy/signin.caddy
+chown dsh:dsh /run/caddy/signin.caddy
+gosu dsh caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
+CADDY_PID=$!
+
 cd "${DSH_WORKSPACE}"
 gosu dsh dsh "$@" > /run/dsh/log 2>&1 &
 DSH_PID=$!
@@ -115,32 +126,34 @@ DSH_PID=$!
     done < /run/dsh/log
 ) &
 
-# Measured at about 2.4 s after start; the health check allows 300, so waiting here
-# costs nothing and keeps Caddy's config a single static file with no reload API.
-printf '# no auto sign-in\n' > /run/caddy/signin.caddy
-if [ -n "${DSH_GATE_PASSWORD:-}" ]; then
+# Arm auto sign-in once the token appears. The line lands about 2.4 s after start,
+# and this waits in the background so it never delays anything that is already
+# serving. A miss leaves the placeholder in place and the deployment falls back to
+# DSH's own token URL rather than breaking.
+(
+    if [ -z "${DSH_GATE_PASSWORD:-}" ]; then
+        echo "dsh: no DSH_GATE_PASSWORD, so auto sign-in stays off — sign in with the 'dsh web:' token below." >&2
+        exit 0
+    fi
     i=0
     while [ ! -s "${TOKEN_FILE}" ] && [ "${i}" -lt 60 ]; do
         kill -0 "${DSH_PID}" 2>/dev/null || break
         i=$((i + 1))
         sleep 1
     done
-    if [ -s "${TOKEN_FILE}" ]; then
-        printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n}\nredir @dsh_needs_signin /?token=%s 302\n' \
-            "$(cat "${TOKEN_FILE}")" > /run/caddy/signin.caddy
+    if [ ! -s "${TOKEN_FILE}" ]; then
+        echo "WARNING: the 'dsh web:' token line did not appear; sign in with its token from this log instead." >&2
+        exit 0
+    fi
+    printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n}\nredir @dsh_needs_signin /?token=%s 302\n' \
+        "$(cat "${TOKEN_FILE}")" > /run/caddy/signin.caddy
+    chown dsh:dsh /run/caddy/signin.caddy
+    if gosu dsh caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null; then
         echo "dsh: auto sign-in armed — open https://${RAILWAY_PUBLIC_DOMAIN:-<your-domain>}/ and authenticate at the edge gate"
     else
-        echo "WARNING: the 'dsh web:' token line did not appear; sign in with its token from this log instead." >&2
+        echo "WARNING: could not reload Caddy to arm auto sign-in; sign in with the 'dsh web:' token from this log." >&2
     fi
-else
-    echo "dsh: no DSH_GATE_PASSWORD, so auto sign-in stays off — sign in with the 'dsh web:' token below." >&2
-fi
-chown dsh:dsh /run/caddy/signin.caddy
-
-# Caddy runs as the same unprivileged user, in the background; tini reaps it. If it
-# dies the health check fails and Railway restarts the container.
-gosu dsh caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
-CADDY_PID=$!
+) &
 
 # dsh is no longer exec'd, so its exit status has to be carried out by hand, and a
 # platform stop has to reach both children rather than only this shell.
