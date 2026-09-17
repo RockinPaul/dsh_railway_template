@@ -43,6 +43,19 @@
 		# 403 while the page still loads.
 		reverse_proxy 127.0.0.1:{$DSH_PORT} {
 			header_up X-Forwarded-Proto https
+
+			# Break the sign-in loop. DSH ends its token exchange with 303 to "/",
+			# which is exactly what the redirect above matches, so the whole thing
+			# terminates only because the session cookie comes back. When it does
+			# not — blocked, cleared by an extension, or a locked-down profile —
+			# the browser bounces between the two forever and Firefox gives up with
+			# "The page isn't redirecting properly". Reported from a real browser.
+			#
+			# Landing that 303 on "/?signedin=1" instead means the second visit
+			# never matches the redirect: it falls through to DSH, which answers a
+			# single 401. A deployment whose cookies do not stick then shows one
+			# honest error instead of an infinite loop.
+			header_down Location ^/$ /?signedin=1
 		}
 	}
 }

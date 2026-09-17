@@ -44,7 +44,13 @@ printf 'basic_auth {\n\tdsh %s\n}\n' "$hash" > "$WORK/run/caddy/gate.caddy"
 # Boot state: Caddy starts before DSH has printed a token, exactly as the entrypoint
 # does, because waiting for one leaves the port unserved and the edge answers 502.
 printf '# no auto sign-in yet\n' > "$WORK/run/caddy/signin.caddy"
-printf ':%s {\n\trespond "BACKEND" 200\n}\n' "$BACKEND_PORT" > "$WORK/backend.caddyfile"
+cat > "$WORK/backend.caddyfile" <<BACKEND
+:$BACKEND_PORT {
+	@exchange query token=*
+	redir @exchange / 303
+	respond "BACKEND" 200
+}
+BACKEND
 sed "s#/run/caddy#$WORK/run/caddy#g" "$HERE/Caddyfile" > "$WORK/gateway.caddyfile"
 
 "$CADDY" start --config "$WORK/backend.caddyfile" --adapter caddyfile >/dev/null 2>&1
@@ -72,7 +78,7 @@ check "GET / still gated"                  401 "$(code "$U/")"
 # Arm auto sign-in the way the entrypoint does: write the snippet, then reload.
 # A probe runs across the reload to prove the listener never drops, which is the
 # whole reason the config is reloaded instead of Caddy being started late.
-printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n}\nredir @dsh_needs_signin /?token=TOK123 302\n' > "$WORK/run/caddy/signin.caddy"
+printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n\tnot query signedin=*\n}\nredir @dsh_needs_signin /?token=TOK123 302\n' > "$WORK/run/caddy/signin.caddy"
 (
     drops=0
     for _ in $(seq 1 40); do
@@ -100,8 +106,21 @@ echo "with credentials:"
 check "GET / redirects into the exchange"  302 "$(code -u dsh:testpass "$U/")"
 check "  and points at the live token"     "/?token=TOK123" \
     "$(curl -s -u dsh:testpass -o /dev/null -D - "$U/" | awk 'tolower($1)=="location:"{print $2}' | tr -d '\r')"
-check "GET /?token=x passes through"       200 "$(code -u dsh:testpass "$U/?token=x")"
+check "GET /?token=x reaches the exchange"  303 "$(code -u dsh:testpass "$U/?token=x")"
 check "GET / + cookie passes through"      200 "$(code -u dsh:testpass -H 'Cookie: dsh-auth-X=1' "$U/")"
 check "GET /api/remote.mux passes through" 200 "$(code -u dsh:testpass "$U/api/remote.mux")"
+
+# The loop guard. DSH ends the exchange with 303 to "/", which is what the sign-in
+# redirect matches, so the flow terminates only because the session cookie comes
+# back. A browser that will not keep the cookie otherwise bounces forever, which is
+# how this surfaced: Firefox's "The page isn't redirecting properly".
+echo "loop guard (a client whose cookies never stick):"
+check "exchange lands on the marker, not /" "/?signedin=1" \
+    "$(curl -s -u dsh:testpass -o /dev/null -D - "$U/?token=TOK123" | awk 'tolower($1)=="location:"{print $2}' | tr -d '\r')"
+check "marker falls through, no redirect"  200 "$(code -u dsh:testpass "$U/?signedin=1")"
+
+# Walk it the way a browser does, with cookie storage disabled entirely.
+hops=$(curl -s -u dsh:testpass -o /dev/null -L --max-redirs 8 -w '%{num_redirects} %{http_code}' "$U/" 2>/dev/null)
+check "cookieless client terminates"       "2 200" "$hops"
 
 exit "$fail"

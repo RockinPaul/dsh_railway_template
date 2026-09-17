@@ -86,7 +86,9 @@ echo "dsh: gateway on :${PORT}, harness on 127.0.0.1:${DSH_PORT}, workspace ${DS
 # with its own secret, and the edge gate decides who gets to reach the exchange.
 #
 # The redirect excludes requests that already carry a cookie or a token, so a stale
-# token answers 401 once instead of looping.
+# token answers 401 once instead of looping. It also excludes the "signedin" marker
+# that the Caddyfile rewrites DSH's 303 onto: without that, a browser whose session
+# cookie does not stick bounces between "/" and the exchange forever.
 mkdir -p /run/dsh
 rm -f /run/dsh/log
 mkfifo /run/dsh/log
@@ -145,7 +147,7 @@ DSH_PID=$!
         echo "WARNING: the 'dsh web:' token line did not appear; sign in with its token from this log instead." >&2
         exit 0
     fi
-    printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n}\nredir @dsh_needs_signin /?token=%s 302\n' \
+    printf '@dsh_needs_signin {\n\tpath /\n\tmethod GET\n\tnot header Cookie *dsh-auth-*\n\tnot query token=*\n\tnot query signedin=*\n}\nredir @dsh_needs_signin /?token=%s 302\n' \
         "$(cat "${TOKEN_FILE}")" > /run/caddy/signin.caddy
     chown dsh:dsh /run/caddy/signin.caddy
     if gosu dsh caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null; then
