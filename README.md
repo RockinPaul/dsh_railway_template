@@ -14,7 +14,7 @@ Built on DeepSeek Harness; not affiliated with or endorsed by DeepSeek.
 
 | Service | Runs | Public | Role |
 |---|---|---|---|
-| `dsh` | `@deepseek-ai/dsh` 0.1.5-rc.1 on `node:22-bookworm-slim`, Caddy 2.11 in front, mise | **yes** | The agent, its browser UI and its shell, home on `/data`. |
+| `dsh` | `@deepseek-ai/dsh` 0.1.5-rc.3 on `node:22-bookworm-slim`, Caddy 2.11 in front, mise | **yes** | The agent, its browser UI and its shell, home on `/data`. |
 | `longmemory` | LongMemory server, built from a pinned commit by [longmemory_railway_template](https://github.com/RockinPaul/longmemory_railway_template) | no | REST + MCP memory store on its own `/data` volume, reachable only on the private network. |
 
 `dsh --profile web` binds loopback only and refuses `--host 0.0.0.0`, so the gateway has to live in

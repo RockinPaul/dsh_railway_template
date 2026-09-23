@@ -6,7 +6,7 @@
 # `latest` dist-tag is an rc, and this pins the version, not the tag.
 FROM node:22-bookworm-slim
 
-ARG DSH_VERSION=0.1.5-rc.1
+ARG DSH_VERSION=0.1.5-rc.3
 # mise gives the box any toolchain (python, go, rust, another node) without rebuilding
 # this image. Its data lives on the volume, so installs persist across redeploys.
 ARG MISE_VERSION=v2026.9.7

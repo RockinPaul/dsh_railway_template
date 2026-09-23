@@ -2,7 +2,7 @@
 
 [DSH](https://github.com/deepseek-ai/deepseek-harness) is DeepSeek Harness, DeepSeek's open-source
 coding agent: a model that reads your files, runs shell commands and keeps working through a long
-task, with a browser UI. This template runs DSH 0.1.5-rc.1 on Railway and pairs it with a
+task, with a browser UI. This template runs DSH 0.1.5-rc.3 on Railway and pairs it with a
 [LongMemory](https://github.com/CaviraOSS/LongMemory) server as an MCP tool server, so the agent
 can recall, store decisions and track task state across sessions. Built on DeepSeek Harness; not
 affiliated with or endorsed by DeepSeek.
@@ -54,7 +54,7 @@ workspace, sessions, settings, credentials and any toolchain you install also li
 
 Two services:
 
-- **dsh** — the only public service. `node:22-bookworm-slim` with `@deepseek-ai/dsh` 0.1.5-rc.1
+- **dsh** — the only public service. `node:22-bookworm-slim` with `@deepseek-ai/dsh` 0.1.5-rc.3
   installed from npm (the package hard-depends on the built web frontend), the Caddy 2.11 binary,
   and mise for toolchains. Health check `/up`, answered by Caddy. Volume at `/data` holding the
   home directory, the harness home, the workspace, the npm prefix and mise data. Runs as an
