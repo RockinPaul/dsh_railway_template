@@ -1,0 +1,7 @@
+{
+  "name": "dsh-railway",
+  "private": true,
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.5-rc.3"
+  }
+}

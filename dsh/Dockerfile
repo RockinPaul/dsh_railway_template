@@ -30,8 +30,18 @@ COPY --from=caddy:2.11-alpine /usr/bin/caddy /usr/local/bin/caddy
 
 # The install is arch-specific (sharp, koffi, a system addon), so it must happen in
 # the build for the target platform rather than be copied in.
-RUN npm install -g "@deepseek-ai/dsh@${DSH_VERSION}" \
+# lockfile, not from the version alone: the package's own ranges are `^0.1.5-rc.N`,
+# so a plain global install mixes the pinned core with whatever plugin packages
+# upstream published since. On 2026-09-22 that turned every fresh deploy of rc.1 into
+# a boot crash ("plugin(s) failed to load: @deepseek-ai/dsh-sandbox-local") behind a
+# green healthcheck, because Caddy answers /up. `npm ci` installs exactly the lock;
+# DSH_VERSION MUST match package.json so the weekly assessment keeps reading the pin.
+COPY package.json package-lock.json /opt/dsh/
+RUN cd /opt/dsh \
+    && node -e 'const w=require("./package.json").dependencies["@deepseek-ai/dsh"]; if (w!==process.env.DSH_VERSION) throw new Error(`DSH_VERSION ${process.env.DSH_VERSION} != package.json ${w}`)' \
+    && npm ci --omit=dev \
     && npm cache clean --force \
+    && ln -s /opt/dsh/node_modules/.bin/dsh /usr/local/bin/dsh \
     && dsh --version
 
 RUN set -eux; \
