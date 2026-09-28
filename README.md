@@ -14,7 +14,7 @@ Built on DeepSeek Harness; not affiliated with or endorsed by DeepSeek.
 
 | Service | Runs | Public | Role |
 |---|---|---|---|
-| `dsh` | `@deepseek-ai/dsh` 0.1.5-rc.3 on `node:22-bookworm-slim`, Caddy 2.11 in front, mise | **yes** | The agent, its browser UI and its shell, home on `/data`. |
+| `dsh` | `@deepseek-ai/dsh` 0.1.7-rc.2 on `node:22-bookworm-slim`, Caddy 2.11 in front, mise | **yes** | The agent, its browser UI and its shell, home on `/data`. |
 | `longmemory` | LongMemory server, built from a pinned commit by [longmemory_railway_template](https://github.com/RockinPaul/longmemory_railway_template) | no | REST + MCP memory store on its own `/data` volume, reachable only on the private network. |
 
 `dsh --profile web` binds loopback only and refuses `--host 0.0.0.0`, so the gateway has to live in
@@ -113,9 +113,13 @@ the credential would publish the harness.
 
 ## Upgrading
 
-- DSH: bump `DSH_VERSION` in `dsh/Dockerfile` and push. Check the
+- DSH: three files move together — `DSH_VERSION` in `dsh/Dockerfile`, the version in
+  `dsh/package.json`, and `dsh/package-lock.json` regenerated with
+  `npm install --package-lock-only --ignore-scripts` (the build fails if the first two disagree).
+  Then run `dsh/test-gateway.sh`. Check the
   [release notes](https://github.com/deepseek-ai/deepseek-harness/releases) — the web surface, the
-  trust fence and the MCP client are all young and change between rcs.
+  trust fence and the MCP client are all young and change between rcs; 0.1.7 changed the sign-in
+  redirect from `/` to `./`, which the Caddyfile's loop guard has to match.
 - mise: bump `MISE_VERSION` and the two digests.
 - LongMemory: pinned in its own template repository.
 
@@ -123,10 +127,12 @@ the credential would publish the harness.
 
 ```
 dsh/Dockerfile                    node:22 + @deepseek-ai/dsh + Caddy binary + mise
+dsh/package.json, package-lock.json  the pinned DSH tree, installed with npm ci
 dsh/entrypoint.sh                 volume prep, trusted hosts, optional gate, LongMemory overlay, gosu
 dsh/Caddyfile                     /up for the health check; Host passthrough to 127.0.0.1:7000
 dsh/longmemory.cordis.patch.yml   the MCP client row
 dsh/railway.json                  builder and health check
+dsh/test-gateway.sh               the gateway's security and sign-in contract, against a stand-in
 ```
 
 ## Licences

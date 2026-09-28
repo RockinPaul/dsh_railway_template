@@ -2,7 +2,7 @@
 
 [DSH](https://github.com/deepseek-ai/deepseek-harness) is DeepSeek Harness, DeepSeek's open-source
 coding agent: a model that reads your files, runs shell commands and keeps working through a long
-task, with a browser UI. This template runs DSH 0.1.5-rc.3 on Railway and pairs it with a
+task, with a browser UI. This template runs DSH 0.1.7-rc.2 on Railway and pairs it with a
 [LongMemory](https://github.com/CaviraOSS/LongMemory) server as an MCP tool server, so the agent
 can recall, store decisions and track task state across sessions. Built on DeepSeek Harness; not
 affiliated with or endorsed by DeepSeek.
@@ -54,7 +54,7 @@ workspace, sessions, settings, credentials and any toolchain you install also li
 
 Two services:
 
-- **dsh** — the only public service. `node:22-bookworm-slim` with `@deepseek-ai/dsh` 0.1.5-rc.3
+- **dsh** — the only public service. `node:22-bookworm-slim` with `@deepseek-ai/dsh` 0.1.7-rc.2
   installed from npm (the package hard-depends on the built web frontend), the Caddy 2.11 binary,
   and mise for toolchains. Health check `/up`, answered by Caddy. Volume at `/data` holding the
   home directory, the harness home, the workspace, the npm prefix and mise data. Runs as an
@@ -81,7 +81,7 @@ same reason.
 
 Clearing `DSH_GATE_PASSWORD` turns the gate off, and with it the automatic sign-in: the deployment
 falls back to DSH's own token URL, printed on the `dsh web:` line of the deploy logs, which you open
-as `https://<your-dsh-domain>/?token=…`. The two move together on purpose. The gate is what decides
+as `https://YOUR-DSH-DOMAIN/?token=…`. The two move together on purpose. The gate is what decides
 who may reach the sign-in exchange, so a deployment that removed the gate but kept the convenience
 would hand a session to whoever loaded the page.
 

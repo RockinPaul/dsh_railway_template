@@ -46,7 +46,12 @@
 			#
 			# Landing that 303 on "/?signedin=1" instead means the second visit
 			# never matches: it falls through and answers a single honest 401.
-			header_down Location ^/$ /?signedin=1
+			#
+			# DSH 0.1.7 answers the exchange with the directory-relative "./" where
+			# 0.1.5 sent "/", and a pattern for "/" alone then let the loop back in
+			# without failing anything visible — the cookie-keeping walk still
+			# signs in. The class matches both, so a pin moving either way is safe.
+			header_down Location ^[.]?/$ /?signedin=1
 
 			# Sign-in is driven by DSH's own answer, not by guessing from the
 			# request. An earlier version redirected when no dsh-auth cookie was

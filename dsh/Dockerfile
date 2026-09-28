@@ -6,12 +6,12 @@
 # `latest` dist-tag is an rc, and this pins the version, not the tag.
 FROM node:22-bookworm-slim
 
-ARG DSH_VERSION=0.1.5-rc.3
+ARG DSH_VERSION=0.1.7-rc.2
 # mise gives the box any toolchain (python, go, rust, another node) without rebuilding
 # this image. Its data lives on the volume, so installs persist across redeploys.
-ARG MISE_VERSION=v2026.9.7
-ARG MISE_SHA256_AMD64=6cc34785ae10c38061e569b64b290fc8ac26e94d12c3f1aeb721790fa8f09196
-ARG MISE_SHA256_ARM64=d8d38909537af5864822f3ad545d48f1cefae15db266b20052a32da7f834fd50
+ARG MISE_VERSION=v2026.9.13
+ARG MISE_SHA256_AMD64=827c7997af2e0e5a418f266ead5df99ee4aae9b6fd435df8dbe79d90f335ff9a
+ARG MISE_SHA256_ARM64=0a9b8c243e717df2706e6822855ac8cfd5089745400565a815a93803cfcd4042
 ARG TARGETARCH
 
 # Workstation tooling for the agent's shell. git is a hard requirement: the agent
@@ -29,13 +29,15 @@ RUN apt-get update \
 COPY --from=caddy:2.11-alpine /usr/bin/caddy /usr/local/bin/caddy
 
 # The install is arch-specific (sharp, koffi, a system addon), so it must happen in
-# the build for the target platform rather than be copied in.
-# lockfile, not from the version alone: the package's own ranges are `^0.1.5-rc.N`,
-# so a plain global install mixes the pinned core with whatever plugin packages
-# upstream published since. On 2026-09-22 that turned every fresh deploy of rc.1 into
-# a boot crash ("plugin(s) failed to load: @deepseek-ai/dsh-sandbox-local") behind a
-# green healthcheck, because Caddy answers /up. `npm ci` installs exactly the lock;
-# DSH_VERSION MUST match package.json so the weekly assessment keeps reading the pin.
+# the build for the target platform rather than be copied in. It installs from the
+# lockfile, not from the version alone: 0.1.5's own ranges were `^0.1.5-rc.N`, so a
+# plain global install mixed the pinned core with whatever plugin packages upstream
+# published since. On 2026-09-22 that turned every fresh deploy of rc.1 into a boot
+# crash ("plugin(s) failed to load: @deepseek-ai/dsh-sandbox-local") behind a green
+# healthcheck, because Caddy answers /up. 0.1.7 pins its own plugins exactly but still
+# takes its runtime libraries (cordis, schemastery) on `~` ranges, so the lock still
+# matters. `npm ci` installs exactly the lock; DSH_VERSION MUST match package.json so
+# the weekly assessment keeps reading the pin.
 COPY package.json package-lock.json /opt/dsh/
 RUN cd /opt/dsh \
     && node -e 'const w=require("./package.json").dependencies["@deepseek-ai/dsh"]; if (w!==process.env.DSH_VERSION) throw new Error(`DSH_VERSION ${process.env.DSH_VERSION} != package.json ${w}`)' \

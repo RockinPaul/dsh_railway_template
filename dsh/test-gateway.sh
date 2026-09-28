@@ -62,8 +62,10 @@ cat > "$WORK/backend.caddyfile" <<BACKEND
 	handle @exchange {
 		header Set-Cookie "dsh-auth-X=good; Path=/"
 		# The matcher is explicit: a bare leading "/" is read as a path matcher, so
-		# \`redir / 303\` redirects to "303".
-		redir * / 303
+		# \`redir / 303\` redirects to "303". The target is "./" because that is
+		# what DSH 0.1.7 answers (0.1.5 sent "/"); against the old "^/$" rewrite
+		# this stand-in loops 8 redirects deep, which the loop-guard checks catch.
+		redir * ./ 303
 	}
 
 	@api path /api*
