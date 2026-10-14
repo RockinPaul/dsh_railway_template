@@ -9,9 +9,9 @@ FROM node:22-bookworm-slim
 ARG DSH_VERSION=0.1.7-rc.2
 # mise gives the box any toolchain (python, go, rust, another node) without rebuilding
 # this image. Its data lives on the volume, so installs persist across redeploys.
-ARG MISE_VERSION=v2026.9.13
-ARG MISE_SHA256_AMD64=827c7997af2e0e5a418f266ead5df99ee4aae9b6fd435df8dbe79d90f335ff9a
-ARG MISE_SHA256_ARM64=0a9b8c243e717df2706e6822855ac8cfd5089745400565a815a93803cfcd4042
+ARG MISE_VERSION=v2026.10.9
+ARG MISE_SHA256_AMD64=7af2e3d798e9ddec142f5a968a18c3f33aa68d19aa8a4111302d4c7d04feb6fa
+ARG MISE_SHA256_ARM64=9a58b5b72e58ed66f38d6d2550c2f6279d8c39884574c389a39a9c441a5580b9
 ARG TARGETARCH
 
 # Workstation tooling for the agent's shell. git is a hard requirement: the agent
