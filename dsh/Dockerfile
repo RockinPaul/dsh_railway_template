@@ -9,9 +9,9 @@ FROM node:22-bookworm-slim
 ARG DSH_VERSION=0.1.7-rc.2
 # mise gives the box any toolchain (python, go, rust, another node) without rebuilding
 # this image. Its data lives on the volume, so installs persist across redeploys.
-ARG MISE_VERSION=v2026.10.24
-ARG MISE_SHA256_AMD64=9a6c9c55f5c6372d0af70a9979fe6d742aea3793267a929e1738022143c466cc
-ARG MISE_SHA256_ARM64=8c8f5d7f748bf3aef431dc50f0ad776270f36025c788aa21c74e2fabdbbd6d3e
+ARG MISE_VERSION=v2026.11.9
+ARG MISE_SHA256_AMD64=23ba592fcbc61f057e2b82c1eafd085832712ba0c759b714ca16cd06babca378
+ARG MISE_SHA256_ARM64=cf2900bfb4279f8d8f8a19d5c27bf1bde826b3e742182f3f67511c588498c786
 ARG TARGETARCH
 
 # Workstation tooling for the agent's shell. git is a hard requirement: the agent
@@ -26,7 +26,7 @@ RUN apt-get update \
 # `dsh --profile web` binds loopback only and rejects --host 0.0.0.0 by design, so the
 # gateway must live in the same container. Caddy's static binary is copied from its
 # own pinned image rather than installed from a moving apt repository.
-COPY --from=caddy:2.11-alpine /usr/bin/caddy /usr/local/bin/caddy
+COPY --from=caddy:2.11.9-alpine /usr/bin/caddy /usr/local/bin/caddy
 
 # The install is arch-specific (sharp, koffi, a system addon), so it must happen in
 # the build for the target platform rather than be copied in. It installs from the

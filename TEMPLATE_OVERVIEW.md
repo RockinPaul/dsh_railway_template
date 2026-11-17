@@ -55,7 +55,7 @@ workspace, sessions, settings, credentials and any toolchain you install also li
 Two services:
 
 - **dsh** — the only public service. `node:22-bookworm-slim` with `@deepseek-ai/dsh` 0.1.7-rc.2
-  installed from npm (the package hard-depends on the built web frontend), the Caddy 2.11 binary,
+  installed from npm (the package hard-depends on the built web frontend), the Caddy 2.11.9 binary,
   and mise for toolchains. Health check `/up`, answered by Caddy. Volume at `/data` holding the
   home directory, the harness home, the workspace, the npm prefix and mise data. Runs as an
   unprivileged user whose home is on the volume.
