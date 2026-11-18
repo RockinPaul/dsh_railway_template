@@ -131,7 +131,6 @@ dsh/package.json, package-lock.json  the pinned DSH tree, installed with npm ci
 dsh/entrypoint.sh                 volume prep, trusted hosts, optional gate, LongMemory overlay, gosu
 dsh/Caddyfile                     /up for the health check; Host passthrough to 127.0.0.1:7000
 dsh/longmemory.cordis.patch.yml   the MCP client row
-dsh/railway.json                  builder and health check
 dsh/test-gateway.sh               the gateway's security and sign-in contract, against a stand-in
 ```
 
